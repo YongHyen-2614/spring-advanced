@@ -12,8 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;  // 추가
 import java.security.Key;
-import java.util.Base64;
 import java.util.Date;
 
 @Slf4j(topic = "JwtUtil")
@@ -25,32 +25,37 @@ public class JwtUtil {
 
     @Value("${jwt.secret.key}")
     private String secretKey;
+
     private Key key;
     private final SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
 
     @PostConstruct
     public void init() {
-        byte[] bytes = Base64.getDecoder().decode(secretKey);
-        key = Keys.hmacShaKeyFor(bytes);
+        //평문 시크릿 그대로 사용 (Base64 디코딩 제거)
+        byte[] keyBytes = secretKey.trim().getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes (HS256).");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String createToken(Long userId, String email, UserRole userRole) {
-        Date date = new Date();
+        Date now = new Date();
 
         return BEARER_PREFIX +
                 Jwts.builder()
                         .setSubject(String.valueOf(userId))
                         .claim("email", email)
                         .claim("userRole", userRole)
-                        .setExpiration(new Date(date.getTime() + TOKEN_TIME))
-                        .setIssuedAt(date) // 발급일
-                        .signWith(key, signatureAlgorithm) // 암호화 알고리즘
+                        .setIssuedAt(now)
+                        .setExpiration(new Date(now.getTime() + TOKEN_TIME))
+                        .signWith(key, signatureAlgorithm)
                         .compact();
     }
 
     public String substringToken(String tokenValue) {
         if (StringUtils.hasText(tokenValue) && tokenValue.startsWith(BEARER_PREFIX)) {
-            return tokenValue.substring(7);
+            return tokenValue.substring(BEARER_PREFIX.length());
         }
         throw new ServerException("Not Found Token");
     }
