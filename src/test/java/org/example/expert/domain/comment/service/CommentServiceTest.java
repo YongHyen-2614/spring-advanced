@@ -36,18 +36,17 @@ class CommentServiceTest {
     @Test
     public void comment_등록_중_할일을_찾지_못해_에러가_발생한다() {
         // given
-        long todoId = 1;
+        long todoId = 1L;
         CommentSaveRequest request = new CommentSaveRequest("contents");
         AuthUser authUser = new AuthUser(1L, "email", UserRole.USER);
 
-        given(todoRepository.findById(anyLong())).willReturn(Optional.empty());
+        given(todoRepository.findById(todoId)).willReturn(Optional.empty());
 
-        // when
+        // when & then
         ServerException exception = assertThrows(ServerException.class, () -> {
             commentService.saveComment(authUser, todoId, request);
         });
 
-        // then
         assertEquals("Todo not found", exception.getMessage());
     }
 
